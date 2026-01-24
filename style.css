@@ -1621,3 +1621,127 @@ input[type="range"] {
 .download-btn:hover {
     background: var(--color-primary-light);
 }
+
+/* Tools Dropdown Menu */
+.tools-dropdown {
+    position: relative;
+}
+
+.btn-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--radius-md);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-tools:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.btn-tools .chevron {
+    transition: transform 0.2s;
+}
+
+.tools-dropdown:hover .btn-tools .chevron {
+    transform: rotate(180deg);
+}
+
+.tools-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    width: 300px;
+    background: var(--color-bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.tools-dropdown:hover .tools-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.tools-menu-header {
+    padding: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-light);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.tool-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    color: var(--color-text);
+    transition: background 0.2s;
+}
+
+.tool-item:hover {
+    background: var(--color-bg);
+}
+
+.tool-item.active {
+    background: rgba(27, 77, 62, 0.1);
+    border-left: 3px solid var(--color-primary);
+}
+
+.tool-icon {
+    font-size: 1.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+}
+
+.tool-item.active .tool-icon {
+    background: rgba(27, 77, 62, 0.15);
+}
+
+.tool-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.tool-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.tool-desc {
+    font-size: 0.75rem;
+    color: var(--color-text-light);
+}
+
+.tools-menu-footer {
+    padding: 0.75rem 1rem;
+    font-size: 0.7rem;
+    color: var(--color-text-light);
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-border);
+    text-align: center;
+}
