@@ -66,7 +66,7 @@ class FormatFlip {
         document.getElementById('startOverBtn')?.addEventListener('click', () => this.startOver());
 
         // Edit tools
-        document.querySelector('[data-tool="bg"]')?.addEventListener('click', () => this.showRemoveBgPanel());
+        document.querySelector('[data-tool="background"]')?.addEventListener('click', () => this.showRemoveBgPanel());
         document.querySelector('[data-tool="crop"]')?.addEventListener('click', () => this.showCropPanel());
         document.querySelector('[data-tool="rotate"]')?.addEventListener('click', () => this.showRotatePanel());
         document.querySelector('[data-tool="resize"]')?.addEventListener('click', () => this.showResizePanel());
@@ -393,6 +393,11 @@ class FormatFlip {
         document.getElementById('bgToolPanel')?.classList.remove('hidden');
         document.getElementById('bgToolPanel')?.classList.add('active');
         this.setupRemoveBgControls();
+
+        // Immediately enable click mode
+        this.showToast('Click on the background color to remove', 'info');
+        this.canvas.style.cursor = 'crosshair';
+        this.canvas.dataset.mode = 'removeBg';
     }
 
     setupRemoveBgControls() {
@@ -402,6 +407,8 @@ class FormatFlip {
         const cancelBtn = document.getElementById('resetBgBtn');
 
         if (toleranceSlider) {
+            // Default to higher tolerance for white backgrounds
+            this.bgTolerance = 50;
             toleranceSlider.value = this.bgTolerance;
             toleranceValue.textContent = this.bgTolerance;
 
@@ -478,15 +485,15 @@ class FormatFlip {
     }
 
     setupCropControls() {
-        const aspectBtns = document.querySelectorAll('#cropToolPanel .preset-btn');
+        const ratioBtns = document.querySelectorAll('#cropToolPanel .preset-btn');
         const applyBtn = document.getElementById('applyCropBtn');
         const cancelBtn = document.getElementById('resetCropBtn');
 
-        aspectBtns.forEach(btn => {
+        ratioBtns.forEach(btn => {
             btn.onclick = () => {
-                aspectBtns.forEach(b => b.classList.remove('active'));
+                ratioBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                this.startCrop(btn.dataset.aspect);
+                this.startCrop(btn.dataset.ratio);
             };
         });
 
@@ -503,16 +510,16 @@ class FormatFlip {
         }
     }
 
-    startCrop(aspect) {
+    startCrop(ratio) {
         this.isCropping = true;
-        this.cropAspect = aspect;
+        this.cropAspect = ratio;
         this.canvas.style.cursor = 'crosshair';
 
         // Calculate default crop area based on aspect ratio
         const canvasAspect = this.canvas.width / this.canvas.height;
         let cropW, cropH;
 
-        if (aspect === 'free') {
+        if (ratio === 'free' || ratio === 'a4') {
             cropW = this.canvas.width * 0.8;
             cropH = this.canvas.height * 0.8;
         } else {
