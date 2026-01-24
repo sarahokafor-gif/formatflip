@@ -3,6 +3,7 @@
 class AuthManager {
     constructor() {
         this.user = null;
+        this.isLoginMode = true;
         this.init();
     }
 
@@ -10,34 +11,32 @@ class AuthManager {
         // Check if Firebase is loaded
         if (typeof firebase === 'undefined') {
             console.warn('Firebase not loaded - running in demo mode');
+            this.hideAuthModal();
             return;
         }
 
         // Listen for auth state changes
         firebase.auth().onAuthStateChanged((user) => {
             this.user = user;
-            this.updateUI(user);
+            if (user) {
+                // User is signed in - hide modal and show app
+                this.hideAuthModal();
+                this.updateUserUI(user);
+            } else {
+                // User is signed out - show auth modal
+                this.showAuthModal();
+            }
         });
     }
 
-    updateUI(user) {
-        const loginBtn = document.getElementById('loginBtn');
-        const userInfo = document.getElementById('userInfo');
-        const userName = document.getElementById('userName');
+    updateUserUI(user) {
+        const userMenuBtn = document.getElementById('userMenuBtn');
+        const userEmail = document.getElementById('userEmail');
+        const userInitial = document.querySelector('.user-initial');
 
-        if (user) {
-            // User is signed in
-            if (loginBtn) loginBtn.style.display = 'none';
-            if (userInfo) userInfo.style.display = 'flex';
-            if (userName) userName.textContent = user.displayName || user.email.split('@')[0];
-
-            // Close auth modal if open
-            this.closeAuthModal();
-        } else {
-            // User is signed out
-            if (loginBtn) loginBtn.style.display = 'flex';
-            if (userInfo) userInfo.style.display = 'none';
-        }
+        if (userMenuBtn) userMenuBtn.classList.remove('hidden');
+        if (userEmail) userEmail.textContent = user.email;
+        if (userInitial) userInitial.textContent = (user.displayName || user.email)[0].toUpperCase();
     }
 
     async login(email, password) {
@@ -49,25 +48,9 @@ class AuthManager {
         }
     }
 
-    async register(name, email, password) {
+    async register(email, password) {
         try {
             const result = await firebase.auth().createUserWithEmailAndPassword(email, password);
-
-            // Update display name
-            await result.user.updateProfile({
-                displayName: name
-            });
-
-            return { success: true, user: result.user };
-        } catch (error) {
-            return { success: false, error: this.getErrorMessage(error.code) };
-        }
-    }
-
-    async loginWithGoogle() {
-        try {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            const result = await firebase.auth().signInWithPopup(provider);
             return { success: true, user: result.user };
         } catch (error) {
             return { success: false, error: this.getErrorMessage(error.code) };
@@ -94,15 +77,15 @@ class AuthManager {
 
     getErrorMessage(code) {
         const messages = {
-            'auth/email-already-in-use': 'This email is already registered. Please sign in.',
+            'auth/email-already-in-use': 'This email is already registered. Please log in.',
             'auth/invalid-email': 'Please enter a valid email address.',
             'auth/operation-not-allowed': 'Email/password accounts are not enabled.',
             'auth/weak-password': 'Password should be at least 6 characters.',
             'auth/user-disabled': 'This account has been disabled.',
             'auth/user-not-found': 'No account found with this email.',
             'auth/wrong-password': 'Incorrect password. Please try again.',
+            'auth/invalid-credential': 'Invalid email or password. Please try again.',
             'auth/too-many-requests': 'Too many attempts. Please try again later.',
-            'auth/popup-closed-by-user': 'Sign in was cancelled.',
             'auth/network-request-failed': 'Network error. Please check your connection.'
         };
         return messages[code] || 'An error occurred. Please try again.';
@@ -111,17 +94,53 @@ class AuthManager {
     showAuthModal() {
         const modal = document.getElementById('authModal');
         if (modal) {
-            modal.classList.add('active');
+            modal.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
         }
     }
 
-    closeAuthModal() {
+    hideAuthModal() {
         const modal = document.getElementById('authModal');
         if (modal) {
-            modal.classList.remove('active');
+            modal.classList.add('hidden');
             document.body.style.overflow = '';
         }
+    }
+
+    toggleMode() {
+        this.isLoginMode = !this.isLoginMode;
+        const authTitle = document.getElementById('authTitle');
+        const authSubtitle = document.getElementById('authSubtitle');
+        const authSubmitBtn = document.getElementById('authSubmitBtn');
+        const authSwitchText = document.getElementById('authSwitchText');
+        const authSwitchBtn = document.getElementById('authSwitchBtn');
+        const confirmPasswordGroup = document.getElementById('confirmPasswordGroup');
+        const disclaimerBox = document.getElementById('disclaimerBox');
+        const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+
+        if (this.isLoginMode) {
+            if (authTitle) authTitle.textContent = 'Welcome Back';
+            if (authSubtitle) authSubtitle.textContent = 'Log in to access FormatFlip';
+            if (authSubmitBtn) authSubmitBtn.textContent = 'Log In';
+            if (authSwitchText) authSwitchText.textContent = "Don't have an account?";
+            if (authSwitchBtn) authSwitchBtn.textContent = 'Register for free';
+            if (confirmPasswordGroup) confirmPasswordGroup.classList.add('hidden');
+            if (disclaimerBox) disclaimerBox.classList.add('hidden');
+            if (forgotPasswordBtn) forgotPasswordBtn.classList.remove('hidden');
+        } else {
+            if (authTitle) authTitle.textContent = 'Create Account';
+            if (authSubtitle) authSubtitle.textContent = 'Register for free access';
+            if (authSubmitBtn) authSubmitBtn.textContent = 'Register';
+            if (authSwitchText) authSwitchText.textContent = 'Already have an account?';
+            if (authSwitchBtn) authSwitchBtn.textContent = 'Log in';
+            if (confirmPasswordGroup) confirmPasswordGroup.classList.remove('hidden');
+            if (disclaimerBox) disclaimerBox.classList.remove('hidden');
+            if (forgotPasswordBtn) forgotPasswordBtn.classList.add('hidden');
+        }
+
+        // Clear any errors
+        const authError = document.getElementById('authError');
+        if (authError) authError.classList.add('hidden');
     }
 
     isLoggedIn() {
@@ -134,90 +153,121 @@ const authManager = new AuthManager();
 
 // DOM Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
-    // Login button
-    const loginBtn = document.getElementById('loginBtn');
-    if (loginBtn) {
-        loginBtn.addEventListener('click', () => authManager.showAuthModal());
-    }
-
-    // Close modal button
-    const closeAuthModal = document.getElementById('closeAuthModal');
-    if (closeAuthModal) {
-        closeAuthModal.addEventListener('click', () => authManager.closeAuthModal());
-    }
-
-    // Close modal on background click
-    const authModal = document.getElementById('authModal');
-    if (authModal) {
-        authModal.addEventListener('click', (e) => {
-            if (e.target === authModal) {
-                authManager.closeAuthModal();
-            }
-        });
-    }
-
-    // Tab switching
-    const authTabs = document.querySelectorAll('.auth-tab');
-    authTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const targetForm = tab.dataset.tab;
-
-            // Update tabs
-            authTabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-
-            // Update forms
-            document.querySelectorAll('.auth-form').forEach(form => {
-                form.classList.remove('active');
-            });
-            document.getElementById(targetForm + 'Form')?.classList.add('active');
-        });
-    });
-
-    // Login form submission
-    const loginForm = document.getElementById('loginForm');
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
+    // Auth form submission
+    const authForm = document.getElementById('authForm');
+    if (authForm) {
+        authForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            const errorDiv = document.getElementById('loginError');
 
-            const result = await authManager.login(email, password);
-            if (!result.success) {
-                errorDiv.textContent = result.error;
-                errorDiv.style.display = 'block';
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            const authError = document.getElementById('authError');
+            const submitBtn = document.getElementById('authSubmitBtn');
+
+            // Disable button during auth
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = authManager.isLoginMode ? 'Logging in...' : 'Registering...';
             }
+
+            let result;
+            if (authManager.isLoginMode) {
+                result = await authManager.login(email, password);
+            } else {
+                // Check confirm password
+                const confirmPassword = document.getElementById('authConfirmPassword').value;
+                if (password !== confirmPassword) {
+                    if (authError) {
+                        authError.textContent = 'Passwords do not match.';
+                        authError.classList.remove('hidden');
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Register';
+                    }
+                    return;
+                }
+
+                // Check terms checkbox
+                const termsCheckbox = document.getElementById('termsCheckbox');
+                if (termsCheckbox && !termsCheckbox.checked) {
+                    if (authError) {
+                        authError.textContent = 'Please accept the terms to continue.';
+                        authError.classList.remove('hidden');
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Register';
+                    }
+                    return;
+                }
+
+                result = await authManager.register(email, password);
+            }
+
+            if (!result.success) {
+                if (authError) {
+                    authError.textContent = result.error;
+                    authError.classList.remove('hidden');
+                }
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = authManager.isLoginMode ? 'Log In' : 'Register';
+                }
+            }
+            // If success, onAuthStateChanged will handle hiding modal
         });
     }
 
-    // Register form submission
-    const registerForm = document.getElementById('registerForm');
-    if (registerForm) {
-        registerForm.addEventListener('submit', async (e) => {
+    // Switch between login and register
+    const authSwitchBtn = document.getElementById('authSwitchBtn');
+    if (authSwitchBtn) {
+        authSwitchBtn.addEventListener('click', () => authManager.toggleMode());
+    }
+
+    // Forgot password
+    const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+    if (forgotPasswordBtn) {
+        forgotPasswordBtn.addEventListener('click', () => {
+            document.getElementById('loginRegisterView').classList.add('hidden');
+            document.getElementById('resetPasswordView').classList.remove('hidden');
+        });
+    }
+
+    // Back to login from reset
+    const backToLoginBtn = document.getElementById('backToLoginBtn');
+    if (backToLoginBtn) {
+        backToLoginBtn.addEventListener('click', () => {
+            document.getElementById('resetPasswordView').classList.add('hidden');
+            document.getElementById('loginRegisterView').classList.remove('hidden');
+        });
+    }
+
+    // Reset password form
+    const resetForm = document.getElementById('resetForm');
+    if (resetForm) {
+        resetForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const name = document.getElementById('registerName').value;
-            const email = document.getElementById('registerEmail').value;
-            const password = document.getElementById('registerPassword').value;
-            const errorDiv = document.getElementById('registerError');
+            const email = document.getElementById('resetEmail').value;
+            const resetError = document.getElementById('resetError');
+            const resetSuccess = document.getElementById('resetSuccess');
 
-            const result = await authManager.register(name, email, password);
-            if (!result.success) {
-                errorDiv.textContent = result.error;
-                errorDiv.style.display = 'block';
+            const result = await authManager.resetPassword(email);
+            if (result.success) {
+                if (resetSuccess) {
+                    resetSuccess.textContent = 'Password reset email sent. Check your inbox.';
+                    resetSuccess.classList.remove('hidden');
+                }
+                if (resetError) resetError.classList.add('hidden');
+            } else {
+                if (resetError) {
+                    resetError.textContent = result.error;
+                    resetError.classList.remove('hidden');
+                }
+                if (resetSuccess) resetSuccess.classList.add('hidden');
             }
         });
     }
-
-    // Google sign in buttons
-    document.querySelectorAll('.google-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const result = await authManager.loginWithGoogle();
-            if (!result.success) {
-                alert(result.error);
-            }
-        });
-    });
 
     // Logout button
     const logoutBtn = document.getElementById('logoutBtn');
@@ -225,21 +275,18 @@ document.addEventListener('DOMContentLoaded', () => {
         logoutBtn.addEventListener('click', () => authManager.logout());
     }
 
-    // Forgot password link
-    const forgotPassword = document.getElementById('forgotPassword');
-    if (forgotPassword) {
-        forgotPassword.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            if (!email) {
-                alert('Please enter your email address first.');
-                return;
-            }
-            const result = await authManager.resetPassword(email);
-            if (result.success) {
-                alert('Password reset email sent. Please check your inbox.');
-            } else {
-                alert(result.error);
+    // User menu toggle
+    const userMenuTrigger = document.querySelector('.user-menu-trigger');
+    const userDropdown = document.getElementById('userDropdown');
+    if (userMenuTrigger && userDropdown) {
+        userMenuTrigger.addEventListener('click', () => {
+            userDropdown.classList.toggle('hidden');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-menu')) {
+                userDropdown.classList.add('hidden');
             }
         });
     }
