@@ -500,6 +500,10 @@ class FormatFlip {
         }
 
         this.ctx.putImageData(imageData, 0, 0);
+
+        // CRITICAL: Update currentImageData to preserve transparency
+        this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+
         this.saveToHistory();
         this.canvas.style.cursor = 'default';
         this.canvas.dataset.mode = '';
