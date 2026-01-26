@@ -321,6 +321,12 @@
                     <h2>Edit Your Image</h2>
                     <p class="section-description">Optional: Remove background, crop, rotate, or resize. Or skip to convert.</p>
 
+                    <!-- Canvas Preview - shown first so it's always visible -->
+                    <div class="canvas-container">
+                        <canvas id="editCanvas"></canvas>
+                        <div id="cropOverlay" class="crop-overlay hidden"></div>
+                    </div>
+
                     <div class="edit-tools">
                         <button class="tool-btn" data-tool="background" id="bgToolBtn">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -467,12 +473,6 @@
                             <button id="resetResizeBtn" class="btn btn-outline">Reset</button>
                             <button id="applyResizeBtn" class="btn btn-primary">Apply</button>
                         </div>
-                    </div>
-
-                    <!-- Canvas Preview -->
-                    <div class="canvas-container">
-                        <canvas id="editCanvas"></canvas>
-                        <div id="cropOverlay" class="crop-overlay hidden"></div>
                     </div>
 
                     <div class="image-nav" id="imageNav">
