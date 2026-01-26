@@ -423,17 +423,13 @@ class FormatFlip {
         document.getElementById('bgToolPanel')?.classList.remove('hidden');
         document.getElementById('bgToolPanel')?.classList.add('active');
         this.setupRemoveBgControls();
-
-        // Immediately enable click mode
-        this.showToast('Click on the background color to remove', 'info');
-        this.canvas.style.cursor = 'crosshair';
-        this.canvas.dataset.mode = 'removeBg';
     }
 
     setupRemoveBgControls() {
         const toleranceSlider = document.getElementById('toleranceSlider');
         const toleranceValue = document.getElementById('toleranceValue');
-        const applyBtn = document.getElementById('applyBgBtn');
+        const autoRemoveBtn = document.getElementById('autoRemoveWhiteBtn');
+        const selectColorBtn = document.getElementById('selectColorBtn');
         const cancelBtn = document.getElementById('resetBgBtn');
 
         if (toleranceSlider) {
@@ -448,16 +444,81 @@ class FormatFlip {
             };
         }
 
-        if (applyBtn) {
-            applyBtn.onclick = () => {
-                this.showToast('Click on the background color to remove', 'info');
+        // Auto remove white background - ONE CLICK
+        if (autoRemoveBtn) {
+            autoRemoveBtn.onclick = () => {
+                this.autoRemoveWhiteBackground();
+            };
+        }
+
+        // Manual color selection mode
+        if (selectColorBtn) {
+            selectColorBtn.onclick = () => {
+                this.showToast('Now click on the color you want to remove', 'info');
                 this.canvas.style.cursor = 'crosshair';
                 this.canvas.dataset.mode = 'removeBg';
             };
         }
 
         if (cancelBtn) {
-            cancelBtn.onclick = () => this.hideAllPanels();
+            cancelBtn.onclick = () => {
+                this.canvas.style.cursor = 'default';
+                this.canvas.dataset.mode = '';
+                this.hideAllPanels();
+            };
+        }
+    }
+
+    // Auto-remove white/light backgrounds with one click
+    autoRemoveWhiteBackground() {
+        const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        const data = imageData.data;
+        const tolerance = this.bgTolerance;
+
+        let removedCount = 0;
+
+        // Loop through all pixels
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Check if pixel is white or near-white
+            // White = RGB(255, 255, 255), check within tolerance
+            const isWhite = (
+                r >= (255 - tolerance) &&
+                g >= (255 - tolerance) &&
+                b >= (255 - tolerance)
+            );
+
+            // Also check for light gray backgrounds
+            const isLightGray = (
+                r >= (240 - tolerance) &&
+                g >= (240 - tolerance) &&
+                b >= (240 - tolerance) &&
+                Math.abs(r - g) < 20 &&
+                Math.abs(g - b) < 20 &&
+                Math.abs(r - b) < 20
+            );
+
+            if (isWhite || isLightGray) {
+                data[i + 3] = 0; // Set alpha to 0 (transparent)
+                removedCount++;
+            }
+        }
+
+        this.ctx.putImageData(imageData, 0, 0);
+
+        // CRITICAL: Update currentImageData to preserve transparency
+        this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+
+        this.saveToHistory();
+        this.hideAllPanels();
+
+        if (removedCount > 0) {
+            this.showToast(`Removed ${removedCount.toLocaleString()} background pixels`, 'success');
+        } else {
+            this.showToast('No white background found to remove', 'info');
         }
     }
 

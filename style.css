@@ -829,6 +829,38 @@ input[type="range"] {
     margin-top: 1rem;
 }
 
+/* Tool panel sections */
+.quick-remove-section {
+    margin-bottom: 1rem;
+}
+
+.tool-divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1.5rem 0;
+    color: var(--color-text-light);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.tool-divider::before,
+.tool-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--color-border);
+}
+
+.custom-color-section {
+    padding-top: 0.5rem;
+}
+
+.btn-full {
+    width: 100%;
+    justify-content: center;
+}
+
 .tolerance-control,
 .custom-rotation {
     margin-bottom: 1rem;
@@ -934,10 +966,18 @@ input[type="range"] {
     color: white;
 }
 
-/* Canvas Container */
+/* Canvas Container - with transparency checkerboard */
 .canvas-container {
     position: relative;
-    background: var(--color-bg);
+    /* Checkerboard pattern to show transparency */
+    background-color: #f0f0f0;
+    background-image:
+        linear-gradient(45deg, #ccc 25%, transparent 25%),
+        linear-gradient(-45deg, #ccc 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ccc 75%),
+        linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     padding: 1rem;
