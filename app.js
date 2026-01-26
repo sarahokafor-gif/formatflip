@@ -326,6 +326,36 @@ class FormatFlip {
         this.currentStep = step;
         this.updateStepIndicator();
         this.updateStepContent();
+
+        // Update preview when going to Step 3
+        if (step === 3) {
+            this.updatePreview();
+        }
+    }
+
+    updatePreview() {
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewInfo = document.getElementById('previewInfo');
+
+        if (previewCanvas && this.canvas) {
+            const ctx = previewCanvas.getContext('2d');
+
+            // Calculate thumbnail size (max 200x150)
+            const maxW = 200, maxH = 150;
+            const ratio = Math.min(maxW / this.canvas.width, maxH / this.canvas.height);
+            const w = Math.round(this.canvas.width * ratio);
+            const h = Math.round(this.canvas.height * ratio);
+
+            previewCanvas.width = w;
+            previewCanvas.height = h;
+            ctx.drawImage(this.canvas, 0, 0, w, h);
+
+            // Update info text
+            if (previewInfo) {
+                const file = this.files[this.currentFileIndex];
+                previewInfo.textContent = `${file?.name || 'Image'} • ${this.canvas.width}×${this.canvas.height}px`;
+            }
+        }
     }
 
     prevStep() {
