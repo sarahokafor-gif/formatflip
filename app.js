@@ -471,51 +471,73 @@ class FormatFlip {
 
     // Auto-remove white/light backgrounds with one click
     autoRemoveWhiteBackground() {
-        const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-        const data = imageData.data;
-        const tolerance = this.bgTolerance;
-
-        let removedCount = 0;
-
-        // Loop through all pixels
-        for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-
-            // Check if pixel is white or near-white
-            const isWhite = (
-                r >= (255 - tolerance) &&
-                g >= (255 - tolerance) &&
-                b >= (255 - tolerance)
-            );
-
-            // Also check for light gray backgrounds
-            const isLightGray = (
-                r >= (240 - tolerance) &&
-                g >= (240 - tolerance) &&
-                b >= (240 - tolerance) &&
-                Math.abs(r - g) < 20 &&
-                Math.abs(g - b) < 20 &&
-                Math.abs(r - b) < 20
-            );
-
-            if (isWhite || isLightGray) {
-                data[i + 3] = 0; // Set alpha to 0 (transparent)
-                removedCount++;
-            }
+        // Guard: ensure an image is loaded
+        if (!this.canvas || !this.canvas.width || !this.canvas.height) {
+            this.showToast('Please upload an image first', 'error');
+            return;
         }
 
-        this.ctx.putImageData(imageData, 0, 0);
-        this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        // Guard: ensure we have a file loaded
+        if (!this.files || !this.files[this.currentFileIndex]) {
+            this.showToast('Please upload an image first', 'error');
+            return;
+        }
 
-        this.saveToHistory();
-        this.hideAllPanels();
+        try {
+            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+            const data = imageData.data;
+            const tolerance = this.bgTolerance;
 
-        if (removedCount > 0) {
-            this.showToast(`Removed ${removedCount.toLocaleString()} background pixels`, 'success');
-        } else {
-            this.showToast('No white background found to remove', 'info');
+            let removedCount = 0;
+
+            // Loop through all pixels (every 4 values = R, G, B, A)
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+
+                // Check if pixel is white or near-white
+                const isWhite = (
+                    r >= (255 - tolerance) &&
+                    g >= (255 - tolerance) &&
+                    b >= (255 - tolerance)
+                );
+
+                // Also check for light gray backgrounds
+                const isLightGray = (
+                    r >= (240 - tolerance) &&
+                    g >= (240 - tolerance) &&
+                    b >= (240 - tolerance) &&
+                    Math.abs(r - g) < 20 &&
+                    Math.abs(g - b) < 20 &&
+                    Math.abs(r - b) < 20
+                );
+
+                if (isWhite || isLightGray) {
+                    data[i + 3] = 0; // Set alpha to 0 (transparent)
+                    removedCount++;
+                }
+            }
+
+            // Put the modified image data back to the canvas
+            this.ctx.putImageData(imageData, 0, 0);
+
+            // Update currentImageData to preserve transparency for export
+            this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+
+            // Save to history for undo/redo
+            this.saveToHistory();
+            this.hideAllPanels();
+
+            if (removedCount > 0) {
+                this.showToast(`Removed ${removedCount.toLocaleString()} background pixels`, 'success');
+            } else {
+                this.showToast('No white background found to remove', 'info');
+            }
+        } catch (error) {
+            console.error('Error removing background:', error);
+            this.showToast('Error removing background', 'error');
+            this.hideAllPanels();
         }
     }
 
@@ -963,6 +985,12 @@ class FormatFlip {
 
     // History (Undo/Redo)
     saveToHistory() {
+        // Guard: ensure we have valid data and file before saving
+        if (!this.currentImageData || !this.files || !this.files[this.currentFileIndex]) {
+            console.warn('No file to save history for');
+            return;
+        }
+
         // Remove any redo history
         this.history = this.history.slice(0, this.historyIndex + 1);
 
@@ -977,6 +1005,8 @@ class FormatFlip {
         }
 
         this.updateUndoRedoButtons();
+
+        // Mark file as edited
         this.files[this.currentFileIndex].edited = true;
     }
 
@@ -1053,10 +1083,28 @@ class FormatFlip {
                 resolve(this.convertToPdf());
             } else if (format === 'tiff') {
                 resolve(this.convertToTiff());
-            } else {
-                this.canvas.toBlob((blob) => {
+            } else if (format === 'jpg' || format === 'jpeg' || format === 'bmp') {
+                // JPEG/BMP don't support transparency - composite onto white background
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = this.canvas.width;
+                tempCanvas.height = this.canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                // Fill with white background first
+                tempCtx.fillStyle = '#FFFFFF';
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+                // Draw the image with transparency on top
+                tempCtx.drawImage(this.canvas, 0, 0);
+
+                tempCanvas.toBlob((blob) => {
                     resolve(blob);
                 }, mime, quality);
+            } else {
+                // PNG, WebP, GIF, AVIF - preserve transparency (do NOT fill with white)
+                this.canvas.toBlob((blob) => {
+                    resolve(blob);
+                }, mime, format === 'png' ? undefined : quality);
             }
         });
     }
