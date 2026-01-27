@@ -599,6 +599,8 @@ class FormatFlip {
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 this.cropRect = null;
+                this.isCropping = false;
+                this.canvas.style.cursor = 'default';
                 this.redrawCanvas();
                 this.hideAllPanels();
             };
@@ -685,15 +687,21 @@ class FormatFlip {
     applyCrop() {
         if (!this.cropRect) return;
 
-        // Get cropped image data
-        const croppedData = this.ctx.getImageData(
-            this.cropRect.x, this.cropRect.y,
-            this.cropRect.width, this.cropRect.height
-        );
+        // IMPORTANT: Restore clean image before cropping (removes overlay/grid)
+        this.ctx.putImageData(this.currentImageData, 0, 0);
 
-        // Resize canvas
-        this.canvas.width = this.cropRect.width;
-        this.canvas.height = this.cropRect.height;
+        // Round coordinates to integers for proper pixel alignment
+        const x = Math.round(this.cropRect.x);
+        const y = Math.round(this.cropRect.y);
+        const width = Math.round(this.cropRect.width);
+        const height = Math.round(this.cropRect.height);
+
+        // Get cropped image data from the CLEAN image
+        const croppedData = this.ctx.getImageData(x, y, width, height);
+
+        // Resize canvas to cropped dimensions (integers)
+        this.canvas.width = width;
+        this.canvas.height = height;
 
         // Put cropped image
         this.ctx.putImageData(croppedData, 0, 0);
@@ -701,6 +709,7 @@ class FormatFlip {
         this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         this.cropRect = null;
         this.isCropping = false;
+        this.canvas.style.cursor = 'default';
         this.saveToHistory();
         this.hideAllPanels();
         this.showToast('Image cropped', 'success');
