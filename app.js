@@ -484,7 +484,6 @@ class FormatFlip {
             const b = data[i + 2];
 
             // Check if pixel is white or near-white
-            // White = RGB(255, 255, 255), check within tolerance
             const isWhite = (
                 r >= (255 - tolerance) &&
                 g >= (255 - tolerance) &&
@@ -508,8 +507,6 @@ class FormatFlip {
         }
 
         this.ctx.putImageData(imageData, 0, 0);
-
-        // CRITICAL: Update currentImageData to preserve transparency
         this.currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
 
         this.saveToHistory();
