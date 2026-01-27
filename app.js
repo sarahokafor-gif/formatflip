@@ -1006,8 +1006,9 @@ class FormatFlip {
 
         this.updateUndoRedoButtons();
 
-        // Mark file as edited
+        // Mark file as edited and store the edited image data
         this.files[this.currentFileIndex].edited = true;
+        this.files[this.currentFileIndex].editedImageData = this.cloneImageData(this.currentImageData);
     }
 
     cloneImageData(imageData) {
@@ -1199,8 +1200,14 @@ class FormatFlip {
     async downloadSingle(index) {
         const file = this.files[index];
 
-        // Load file if not current
-        if (index !== this.currentFileIndex) {
+        // Restore edited state if available (preserves background removal edits)
+        if (file.editedImageData) {
+            this.canvas.width = file.editedImageData.width;
+            this.canvas.height = file.editedImageData.height;
+            this.ctx.putImageData(file.editedImageData, 0, 0);
+            this.currentImageData = this.cloneImageData(file.editedImageData);
+        } else if (index !== this.currentFileIndex) {
+            // Only load original if no edits and not current file
             this.currentFileIndex = index;
             this.loadCurrentFile();
         }
@@ -1229,9 +1236,17 @@ class FormatFlip {
         for (let i = 0; i < this.files.length; i++) {
             const file = this.files[i];
 
-            // Load file
-            this.currentFileIndex = i;
-            this.loadCurrentFile();
+            // Restore edited state if available (preserves background removal edits)
+            if (file.editedImageData) {
+                this.canvas.width = file.editedImageData.width;
+                this.canvas.height = file.editedImageData.height;
+                this.ctx.putImageData(file.editedImageData, 0, 0);
+                this.currentImageData = this.cloneImageData(file.editedImageData);
+            } else {
+                // Load original if no edits
+                this.currentFileIndex = i;
+                this.loadCurrentFile();
+            }
 
             const blob = await this.convertToFormat(this.selectedFormat);
             zip.file(`${file.name}.${this.selectedFormat}`, blob);
