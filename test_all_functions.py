@@ -26,7 +26,8 @@ SCRATCHPAD = Path("/private/tmp/claude/-Users-sarahokafor/d1dc396f-5317-4746-a22
 SCREENSHOT_DIR = SCRATCHPAD / "screenshots"
 REPORT_PATH = SCRATCHPAD / "test_report.md"
 USE_LIVE = "--live" in sys.argv
-APP_URL = "https://formatflip.pages.dev" if USE_LIVE else f"file://{PROJECT_DIR / 'index.html'}"
+LIVE_URL = sys.argv[sys.argv.index("--live") + 1] if "--live" in sys.argv and len(sys.argv) > sys.argv.index("--live") + 1 else "https://formatflip.pages.dev"
+APP_URL = LIVE_URL if USE_LIVE else f"file://{PROJECT_DIR / 'index.html'}"
 
 # --- Test Image Generation ---
 
