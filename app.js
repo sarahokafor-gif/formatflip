@@ -113,7 +113,6 @@ class FormatFlip {
 
         // Download buttons
         document.getElementById('downloadAllBtn')?.addEventListener('click', () => this.downloadAsZip());
-        document.getElementById('downloadZipBtn')?.addEventListener('click', () => this.downloadAsZip());
 
         // Help modal
         document.getElementById('helpBtn')?.addEventListener('click', () => this.showHelpModal());
@@ -169,20 +168,22 @@ class FormatFlip {
     // File Handling
     async handleFiles(fileList) {
         const files = Array.from(fileList);
-        const imageFiles = files.filter(f =>
+        const supportedFiles = files.filter(f =>
             f.type.startsWith('image/') ||
+            f.type === 'application/pdf' ||
             f.name.toLowerCase().endsWith('.heic') ||
-            f.name.toLowerCase().endsWith('.heif')
+            f.name.toLowerCase().endsWith('.heif') ||
+            f.name.toLowerCase().endsWith('.pdf')
         );
 
-        if (imageFiles.length === 0) {
-            this.showToast('Please select image files', 'error');
+        if (supportedFiles.length === 0) {
+            this.showToast('Please select image or PDF files', 'error');
             return;
         }
 
         this.showLoading('Processing files...');
 
-        for (const file of imageFiles) {
+        for (const file of supportedFiles) {
             try {
                 let processedFile = file;
 
@@ -190,6 +191,16 @@ class FormatFlip {
                 if (file.name.toLowerCase().endsWith('.heic') ||
                     file.name.toLowerCase().endsWith('.heif')) {
                     processedFile = await this.convertHeic(file);
+                }
+
+                // Convert PDF to image
+                if (file.type === 'application/pdf' ||
+                    file.name.toLowerCase().endsWith('.pdf')) {
+                    const pdfImages = await this.convertPdfToImages(file);
+                    for (const pdfImg of pdfImages) {
+                        this.files.push(pdfImg);
+                    }
+                    continue;
                 }
 
                 const imageData = await this.loadImage(processedFile);
@@ -231,6 +242,52 @@ class FormatFlip {
         return new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), {
             type: 'image/jpeg'
         });
+    }
+
+    async convertPdfToImages(file) {
+        // Load pdf.js if not available
+        if (typeof pdfjsLib === 'undefined') {
+            await this.loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const results = [];
+        const baseName = file.name.replace(/\.pdf$/i, '');
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            // Render at 3x scale for high quality
+            const scale = 3;
+            const viewport = page.getViewport({ scale });
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = viewport.width;
+            tempCanvas.height = viewport.height;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            await page.render({ canvasContext: tempCtx, viewport }).promise;
+
+            // Create an Image element from the rendered canvas
+            const dataUrl = tempCanvas.toDataURL('image/png');
+            const img = new Image();
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = dataUrl;
+            });
+
+            results.push({
+                original: file,
+                name: pdf.numPages > 1 ? `${baseName}_page${i}` : baseName,
+                imageData: { width: img.width, height: img.height, element: img },
+                edited: false
+            });
+        }
+
+        this.showToast(`Loaded ${pdf.numPages} page${pdf.numPages > 1 ? 's' : ''} from PDF`, 'success');
+        return results;
     }
 
     loadScript(src) {
