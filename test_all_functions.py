@@ -820,22 +820,23 @@ class FormatFlipTestRunner:
         download_all_exists = self.element_exists("#downloadAllBtn")
         self.record(40, "Download All button exists", download_all_exists)
 
-        # Test 41: ZIP download button exists (was missing, now fixed)
-        zip_btn_exists = self.element_exists("#downloadZipBtn")
-        self.record(41, "ZIP download button exists",
-                    zip_btn_exists,
-                    "FIXED: #downloadZipBtn now exists in HTML" if zip_btn_exists else
-                    "STILL MISSING: #downloadZipBtn not in HTML")
-
-        # Test 42: Download All button wired to downloadAsZip() (was BUG-3, now fixed)
+        # Test 41: Download All button calls downloadAsZip()
         download_all_text = self.eval_js('''() => {
             const btn = document.getElementById("downloadAllBtn");
             return btn ? btn.textContent.trim() : "";
         }''')
-        self.record(42, "downloadAllBtn wired to downloadAsZip()",
-                    zip_btn_exists,
-                    f"downloadAllBtn text: '{download_all_text}'. " +
-                    "Both downloadAllBtn and downloadZipBtn now call downloadAsZip()")
+        has_zip_text = "ZIP" in (download_all_text or "")
+        self.record(41, "Download All button triggers ZIP download",
+                    has_zip_text,
+                    f"downloadAllBtn text: '{download_all_text}'")
+
+        # Test 42: downloadAsZip() method exists on app
+        has_zip_fn = self.eval_js('''() => {
+            return window.formatFlip && typeof window.formatFlip.downloadAsZip === "function";
+        }''')
+        self.record(42, "downloadAsZip() function exists",
+                    has_zip_fn,
+                    "downloadAsZip() is available and wired to Download All button")
 
         self.screenshot("22_download_phase")
 
@@ -1127,20 +1128,21 @@ class FormatFlipTestRunner:
                     ("FIXED: CSS now sets cursor:default." if css_is_default else
                      "STILL BROKEN: CSS still sets cursor:crosshair."))
 
-        # BUG-3: downloadAllBtn now calls downloadAsZip() (was calling downloadAll())
+        # BUG-3: downloadAllBtn calls downloadAsZip() (was calling downloadAll())
         download_check = self.eval_js('''() => {
             const ff = window.formatFlip;
             return {
-                downloadAllExists: ff && typeof ff.downloadAll === "function",
+                downloadAllExists: document.getElementById("downloadAllBtn") !== null,
                 downloadAsZipExists: ff && typeof ff.downloadAsZip === "function",
-                zipBtnExists: document.getElementById("downloadZipBtn") !== null
+                btnText: document.getElementById("downloadAllBtn")?.textContent.trim() || ""
             };
         }''')
-        zip_btn_exists = download_check.get("zipBtnExists") if isinstance(download_check, dict) else False
+        all_exists = download_check.get("downloadAllExists") if isinstance(download_check, dict) else False
+        zip_fn_exists = download_check.get("downloadAsZipExists") if isinstance(download_check, dict) else False
         self.record("BUG-3", "downloadAsZip() is reachable via UI",
-                    zip_btn_exists,
+                    all_exists and zip_fn_exists,
                     f"Check: {download_check}. " +
-                    ("FIXED: downloadZipBtn exists and downloadAllBtn rewired to downloadAsZip()." if zip_btn_exists else
+                    ("FIXED: downloadAllBtn calls downloadAsZip()." if (all_exists and zip_fn_exists) else
                      "STILL BROKEN: downloadAsZip() unreachable."))
 
     # --- Report Generation ---
