@@ -197,6 +197,9 @@ class FormatFlip {
                 if (file.type === 'application/pdf' ||
                     file.name.toLowerCase().endsWith('.pdf')) {
                     const pdfImages = await this.convertPdfToImages(file);
+                    if (pdfImages.length === 0) {
+                        this.showToast(`Could not convert ${file.name}. Try saving as PNG first.`, 'error');
+                    }
                     for (const pdfImg of pdfImages) {
                         this.files.push(pdfImg);
                     }
@@ -263,11 +266,18 @@ class FormatFlip {
                     };
                     check();
                 });
-                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
             }
 
             const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            // Disable worker to avoid cross-origin/CDN worker loading failures
+            // that cause InvalidPDFException
+            const pdf = await pdfjsLib.getDocument({
+                data: arrayBuffer,
+                disableWorker: true,
+                useWorkerFetch: false,
+                isEvalSupported: false,
+                useSystemFonts: true
+            }).promise;
             const results = [];
             const baseName = file.name.replace(/\.pdf$/i, '');
 
