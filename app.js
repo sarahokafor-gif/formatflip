@@ -245,49 +245,67 @@ class FormatFlip {
     }
 
     async convertPdfToImages(file) {
-        // Load pdf.js if not available
-        if (typeof pdfjsLib === 'undefined') {
-            await this.loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        try {
+            // Load pdf.js if not available
+            if (typeof pdfjsLib === 'undefined') {
+                await this.loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+                // Wait for pdfjsLib to be available on window
+                await new Promise((resolve, reject) => {
+                    let attempts = 0;
+                    const check = () => {
+                        if (typeof pdfjsLib !== 'undefined') {
+                            resolve();
+                        } else if (++attempts > 50) {
+                            reject(new Error('pdf.js failed to initialize'));
+                        } else {
+                            setTimeout(check, 100);
+                        }
+                    };
+                    check();
+                });
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            }
+
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const results = [];
+            const baseName = file.name.replace(/\.pdf$/i, '');
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const scale = 3;
+                const viewport = page.getViewport({ scale });
+
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = viewport.width;
+                tempCanvas.height = viewport.height;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                await page.render({ canvasContext: tempCtx, viewport }).promise;
+
+                const dataUrl = tempCanvas.toDataURL('image/png');
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = dataUrl;
+                });
+
+                results.push({
+                    original: file,
+                    name: pdf.numPages > 1 ? `${baseName}_page${i}` : baseName,
+                    imageData: { width: img.width, height: img.height, element: img },
+                    edited: false
+                });
+            }
+
+            this.showToast(`Loaded ${pdf.numPages} page${pdf.numPages > 1 ? 's' : ''} from PDF`, 'success');
+            return results;
+        } catch (error) {
+            console.error('PDF conversion failed:', error);
+            this.showToast(`Failed to load PDF: ${error.message}`, 'error');
+            return [];
         }
-
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        const results = [];
-        const baseName = file.name.replace(/\.pdf$/i, '');
-
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            // Render at 3x scale for high quality
-            const scale = 3;
-            const viewport = page.getViewport({ scale });
-
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = viewport.width;
-            tempCanvas.height = viewport.height;
-            const tempCtx = tempCanvas.getContext('2d');
-
-            await page.render({ canvasContext: tempCtx, viewport }).promise;
-
-            // Create an Image element from the rendered canvas
-            const dataUrl = tempCanvas.toDataURL('image/png');
-            const img = new Image();
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = reject;
-                img.src = dataUrl;
-            });
-
-            results.push({
-                original: file,
-                name: pdf.numPages > 1 ? `${baseName}_page${i}` : baseName,
-                imageData: { width: img.width, height: img.height, element: img },
-                edited: false
-            });
-        }
-
-        this.showToast(`Loaded ${pdf.numPages} page${pdf.numPages > 1 ? 's' : ''} from PDF`, 'success');
-        return results;
     }
 
     loadScript(src) {
@@ -1242,19 +1260,12 @@ class FormatFlip {
             item.innerHTML = `
                 <div class="download-info">
                     <span class="download-name">${file.name}.${this.selectedFormat}</span>
-                    <span class="download-size">Processing...</span>
+                    <span class="download-size" id="fileSize-${i}">Preparing...</span>
                 </div>
-                <button class="download-btn" data-index="${i}">Download</button>
+                <button class="download-btn" data-index="${i}" disabled>Download</button>
             `;
             downloadList.appendChild(item);
         }
-
-        // Add download button listeners
-        downloadList.querySelectorAll('.download-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.downloadSingle(parseInt(btn.dataset.index));
-            });
-        });
 
         // Hide ZIP button for single file, show for multiple
         if (downloadAllBtn) {
@@ -1264,6 +1275,50 @@ class FormatFlip {
         const desc = document.getElementById('downloadDescription');
         if (heading) heading.textContent = isSingle ? 'Download Your File' : 'Download Your Files';
         if (desc) desc.textContent = isSingle ? 'Your converted file is ready' : 'Your converted files are ready';
+
+        // Pre-convert each file and store the blob so download is instant
+        for (let i = 0; i < this.files.length; i++) {
+            const file = this.files[i];
+            try {
+                // Restore canvas to this file's state
+                if (file.editedImageData) {
+                    this.canvas.width = file.editedImageData.width;
+                    this.canvas.height = file.editedImageData.height;
+                    this.ctx.putImageData(file.editedImageData, 0, 0);
+                } else {
+                    this.currentFileIndex = i;
+                    this.loadCurrentFile();
+                }
+
+                const blob = await this.convertToFormat(this.selectedFormat);
+                file.convertedBlob = blob;
+
+                const sizeEl = document.getElementById(`fileSize-${i}`);
+                const btn = downloadList.querySelector(`.download-btn[data-index="${i}"]`);
+                if (sizeEl) {
+                    const kb = (blob.size / 1024).toFixed(1);
+                    sizeEl.textContent = kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
+                }
+                if (btn) btn.disabled = false;
+            } catch (error) {
+                console.error(`Failed to convert file ${i}:`, error);
+                const sizeEl = document.getElementById(`fileSize-${i}`);
+                if (sizeEl) sizeEl.textContent = 'Conversion failed';
+            }
+        }
+
+        // Add download button listeners
+        downloadList.querySelectorAll('.download-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const index = parseInt(btn.dataset.index);
+                const file = this.files[index];
+                if (file.convertedBlob) {
+                    this.triggerDownload(file.convertedBlob, `${file.name}.${this.selectedFormat}`);
+                } else {
+                    this.downloadSingle(index);
+                }
+            });
+        });
     }
 
     async downloadSingle(index) {
@@ -1305,19 +1360,21 @@ class FormatFlip {
         for (let i = 0; i < this.files.length; i++) {
             const file = this.files[i];
 
-            // Restore edited state if available (preserves background removal edits)
-            if (file.editedImageData) {
-                this.canvas.width = file.editedImageData.width;
-                this.canvas.height = file.editedImageData.height;
-                this.ctx.putImageData(file.editedImageData, 0, 0);
-                this.currentImageData = this.cloneImageData(file.editedImageData);
-            } else {
-                // Load original if no edits
-                this.currentFileIndex = i;
-                this.loadCurrentFile();
+            // Use pre-converted blob if available from prepareDownloads
+            let blob = file.convertedBlob;
+            if (!blob) {
+                if (file.editedImageData) {
+                    this.canvas.width = file.editedImageData.width;
+                    this.canvas.height = file.editedImageData.height;
+                    this.ctx.putImageData(file.editedImageData, 0, 0);
+                    this.currentImageData = this.cloneImageData(file.editedImageData);
+                } else {
+                    this.currentFileIndex = i;
+                    this.loadCurrentFile();
+                }
+                blob = await this.convertToFormat(this.selectedFormat);
             }
 
-            const blob = await this.convertToFormat(this.selectedFormat);
             zip.file(`${file.name}.${this.selectedFormat}`, blob);
         }
 
