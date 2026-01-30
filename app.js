@@ -112,7 +112,7 @@ class FormatFlip {
         }
 
         // Download buttons
-        document.getElementById('downloadAllBtn')?.addEventListener('click', () => this.downloadAll());
+        document.getElementById('downloadAllBtn')?.addEventListener('click', () => this.downloadAsZip());
         document.getElementById('downloadZipBtn')?.addEventListener('click', () => this.downloadAsZip());
 
         // Help modal
@@ -639,7 +639,7 @@ class FormatFlip {
             cropW = this.canvas.width * 0.8;
             cropH = this.canvas.height * 0.8;
         } else {
-            const [w, h] = aspect.split(':').map(Number);
+            const [w, h] = ratio.split(':').map(Number);
             const targetAspect = w / h;
 
             if (targetAspect > canvasAspect) {
