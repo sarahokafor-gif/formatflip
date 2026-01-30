@@ -1232,6 +1232,9 @@ class FormatFlip {
 
         downloadList.innerHTML = '';
 
+        const isSingle = this.files.length === 1;
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+
         for (let i = 0; i < this.files.length; i++) {
             const file = this.files[i];
             const item = document.createElement('div');
@@ -1252,6 +1255,15 @@ class FormatFlip {
                 this.downloadSingle(parseInt(btn.dataset.index));
             });
         });
+
+        // Hide ZIP button for single file, show for multiple
+        if (downloadAllBtn) {
+            downloadAllBtn.style.display = isSingle ? 'none' : '';
+        }
+        const heading = document.getElementById('downloadHeading');
+        const desc = document.getElementById('downloadDescription');
+        if (heading) heading.textContent = isSingle ? 'Download Your File' : 'Download Your Files';
+        if (desc) desc.textContent = isSingle ? 'Your converted file is ready' : 'Your converted files are ready';
     }
 
     async downloadSingle(index) {
