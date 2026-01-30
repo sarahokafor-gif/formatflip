@@ -293,6 +293,16 @@ class FormatFlip {
 
                 await page.render({ canvasContext: tempCtx, viewport }).promise;
 
+                // Remove white background pixels so PDF renders with transparency
+                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                const data = imageData.data;
+                for (let px = 0; px < data.length; px += 4) {
+                    if (data[px] > 250 && data[px + 1] > 250 && data[px + 2] > 250) {
+                        data[px + 3] = 0;
+                    }
+                }
+                tempCtx.putImageData(imageData, 0, 0);
+
                 const dataUrl = tempCanvas.toDataURL('image/png');
                 const img = new Image();
                 await new Promise((resolve, reject) => {
