@@ -10,6 +10,9 @@ build/
 .env.local
 .env.production
 
+# Generated config (created by build script)
+firebase-config.js
+
 # IDE
 .vscode/
 .idea/
